@@ -21,12 +21,6 @@ void usage()
 	printf("ex:    send_arp wlan0 192.168.10.2 192.168.10.1\n");
 }
 
-void print_mac(const char *head, unsigned char *data)
-{
-  printf("%s\t%02x:%02x:%02x:%02x:%02x:%02x\n", head,
-    data[0], data[1], data[2], data[3], data[4], data[5]);
-}
-
 static int GetSvrMacAddress( char *pIface, unsigned char *cMacAddr)
 {
 	int nSD;
