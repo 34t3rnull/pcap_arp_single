@@ -92,7 +92,8 @@ void SendPacket(pcap_t* handle, in_addr *src_ip, in_addr *dst_ip, unsigned char 
 
 	if(pcap_sendpacket(handle, packet, sizeof(struct ether_header)+ sizeof(struct ether_arp)))
 		printf("SendPacket Failed\n");
-	printf("SendPacket Success!\n");
+	else
+		printf("SendPacket Success!\n");
 	//sleep(3);
 }
 
