@@ -147,7 +147,6 @@ int main(int argc, char *argv[])
 	dev = argv[1];
 	inet_aton(argv[2], &sender_ip);
 	inet_aton(argv[3], &target_ip);
-	inet_aton("192.168.60.141", &LocalIP);
 	
 	GetMyInfo(dev, LocalMac, &LocalIP);
 	GetTargetMac(dev, &LocalIP, &sender_ip, LocalMac, SenderMac);
